@@ -16,11 +16,13 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"reflect"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	libio "github.com/fatedier/golib/io"
@@ -177,8 +179,36 @@ func (pxy *BaseProxy) HandleTCPWorkConnection(workConn net.Conn, m *msg.StartWor
 		connInfo.DstAddr = dstAddr
 	}
 
-	if baseCfg.Transport.ProxyProtocolVersion != "" && m.SrcAddr != "" && m.SrcPort != 0 {
-		// Use the common proxy protocol builder function
+	var dialer *net.Dialer
+	if baseCfg.Transport.IpSpoofing && m.SrcAddr != "" && m.SrcPort != 0 {
+		dialer = &net.Dialer{
+			LocalAddr: connInfo.SrcAddr,
+			Timeout:   10 * time.Second,
+		}
+		dialer.Control = func(network, address string, c syscall.RawConn) error {
+			var syscallErr error
+			err := c.Control(func(fd uintptr) {
+				syscallErr = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TRANSPARENT, 1)
+				if syscallErr != nil {
+					syscallErr = fmt.Errorf("setsockopt(IP_TRANSPARENT, 1): %w", syscallErr)
+					return
+				}
+
+				if baseCfg.Transport.PktMark > 0 {
+					syscallErr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, baseCfg.Transport.PktMark)
+					if syscallErr != nil {
+						syscallErr = fmt.Errorf("setsockopt(SOL_SOCK, SO_MARK, %d): %w", 123, syscallErr)
+						return
+					}
+				}
+			})
+			if err != nil {
+				return err
+			}
+			return syscallErr
+		}
+	} else if baseCfg.Transport.ProxyProtocolVersion != "" && m.SrcAddr != "" && m.SrcPort != 0 {
+		// Use the common proxy protocol builder functionAdd commentMore actions
 		header := netpkg.BuildProxyProtocolHeaderStruct(connInfo.SrcAddr, connInfo.DstAddr, baseCfg.Transport.ProxyProtocolVersion)
 		connInfo.ProxyProtocolHeader = header
 	}
@@ -193,10 +223,16 @@ func (pxy *BaseProxy) HandleTCPWorkConnection(workConn net.Conn, m *msg.StartWor
 		return
 	}
 
-	localConn, err := libnet.Dial(
-		net.JoinHostPort(baseCfg.LocalIP, strconv.Itoa(baseCfg.LocalPort)),
-		libnet.WithTimeout(10*time.Second),
-	)
+	var localConn net.Conn
+	if dialer != nil {
+		localConn, err = dialer.Dial("tcp", net.JoinHostPort(baseCfg.LocalIP, strconv.Itoa(baseCfg.LocalPort)))
+	} else {
+		localConn, err = libnet.Dial(
+			net.JoinHostPort(baseCfg.LocalIP, strconv.Itoa(baseCfg.LocalPort)),
+			libnet.WithTimeout(10*time.Second),
+		)
+	}
+
 	if err != nil {
 		workConn.Close()
 		xl.Errorf("connect to local service [%s:%d] error: %v", baseCfg.LocalIP, baseCfg.LocalPort, err)

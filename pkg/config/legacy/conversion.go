@@ -197,6 +197,8 @@ func Convert_ProxyConf_To_v1_Base(conf ProxyConf) *v1.ProxyBaseConfig {
 	out.Transport.BandwidthLimit = base.BandwidthLimit
 	out.Transport.BandwidthLimitMode = base.BandwidthLimitMode
 	out.Transport.ProxyProtocolVersion = base.ProxyProtocolVersion
+	out.Transport.IpSpoofing = base.IpSpoofing
+	out.Transport.PktMark = base.PktMark
 
 	out.LoadBalancer.Group = base.Group
 	out.LoadBalancer.GroupKey = base.GroupKey

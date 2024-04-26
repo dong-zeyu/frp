@@ -171,6 +171,9 @@ type BaseProxyConf struct {
 	// version will be automatically selected. By default, this value is "".
 	ProxyProtocolVersion string `ini:"proxy_protocol_version" json:"proxy_protocol_version"`
 
+	IpSpoofing bool `ini:"ip_spoofing" json:"ip_spoofing"`
+	PktMark    int  `ini:"pkt_mark" json:"pkt_mark"`
+
 	// BandwidthLimit limit the bandwidth
 	// 0 means no limit
 	BandwidthLimit types.BandwidthQuantity `ini:"bandwidth_limit" json:"bandwidth_limit"`

@@ -47,6 +47,8 @@ type ProxyTransport struct {
 	// values include "v1", "v2", and "". If the value is "", a protocol
 	// version will be automatically selected. By default, this value is "".
 	ProxyProtocolVersion string `json:"proxyProtocolVersion,omitempty"`
+	IpSpoofing           bool   `json:"ipSpoofing,omitempty"`
+	PktMark              int    `json:"pktMark,omitempty"`
 }
 
 type LoadBalancerConfig struct {
